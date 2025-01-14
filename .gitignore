@@ -1,6 +1,0 @@
-/target
-
-config.json
-config_*.json
-.env
-.envrc
