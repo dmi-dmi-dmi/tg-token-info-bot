@@ -1,0 +1,16 @@
+[package]
+name = "token_info"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+flexi_logger = "0.31.2"
+log = "0.4.27"
+regex = "1.11.1"
+reqwest = "0.12.22"
+rust_decimal = { version = "1.37.2", features = ["serde", "macros"] }
+serde = { version = "1.0.219", features = ["serde_derive"] }
+serde_json = "1.0.142"
+teloxide = "0.17.0"
+tokio = { version = "1.47.1", features = ["macros"] }
