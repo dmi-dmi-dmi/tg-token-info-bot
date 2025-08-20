@@ -52,7 +52,8 @@ async fn message_handler(
         return Ok(());
     }
 
-    let Some(msg_text) = message.text() else {
+    let maybe_text = message.text().or_else(|| message.caption());
+    let Some(msg_text) = maybe_text else {
         warn!("Impossible case - text message doesn't contain text!");
         return Ok(());
     };
