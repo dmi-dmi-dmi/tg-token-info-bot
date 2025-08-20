@@ -7,7 +7,6 @@ use serde::Deserialize;
 #[serde(default)]
 pub struct Config {
     pub whitelisted_chats: Vec<i64>,
-    pub token: String,
 }
 
 pub fn load_config_or_default<P: AsRef<Path>>(filename: P) -> Config {

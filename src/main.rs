@@ -142,6 +142,8 @@ async fn message_handler(
 
 #[tokio::main]
 async fn main() {
+    dotenv::from_filename(".envrc").ok();
+
     Logger::try_with_env_or_str("info")
         .unwrap()
         .adaptive_format_for_stdout(AdaptiveFormat::Opt)
@@ -149,14 +151,17 @@ async fn main() {
         .start()
         .unwrap();
 
+    let Ok(bot_token) = std::env::var("BOT_TOKEN") else {
+        panic!("Bot token not found nor in the env variables or in the .env file");
+    };
+
+    let config = load_config_or_default("./config.json");
+    APP_CONFIG.set(config).unwrap();
+
     let reqwest_client = reqwest::Client::new();
     init_token_regex();
 
-    let config = load_config_or_default("./config.json");
-
-    let bot = Bot::new(config.token.clone());
-
-    APP_CONFIG.set(config).unwrap();
+    let bot = Bot::new(bot_token);
 
     let throttle_info: Arc<RwLock<ThrottlingInfo>> = Arc::new(RwLock::new(HashMap::new()));
 
