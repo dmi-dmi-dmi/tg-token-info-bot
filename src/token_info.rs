@@ -2,7 +2,7 @@ use std::sync::OnceLock;
 
 use anyhow::anyhow;
 use log::warn;
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use rust_decimal::{Decimal, dec};
 use serde::Deserialize;
 
@@ -84,9 +84,11 @@ pub static TOKEN_REGEX: OnceLock<Regex> = OnceLock::new();
 
 pub fn init_token_regex() {
     // this is safe as long as the regex itself is valid
-    let regex = Regex::new(
-        "(?:https:\\/\\/gmgn\\.ai\\/sol\\/token\\/(?:[a-zA-Z0-9]{4,10}_)?|^| )(?P<token_ca>[1-9A-HJ-NP-Za-km-z]{32,44})",
+    let regex = RegexBuilder::new(
+        "(?:https:\\/\\/gmgn\\.ai\\/sol\\/token\\/(?:[a-zA-Z0-9]{4,10}_)?|^|\\s)(?P<token_ca>[1-9A-HJ-NP-Za-km-z]{32,44})",
     )
+    .multi_line(true)
+    .build()
     .unwrap();
     // This is safe if init_pool_regex is called just once directly in the main fn
     TOKEN_REGEX.set(regex).unwrap();
