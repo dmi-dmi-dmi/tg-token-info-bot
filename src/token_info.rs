@@ -32,6 +32,8 @@ pub struct TokenInfo {
     pub symbol: String,
     #[serde(default)]
     pub launchpad: Option<String>,
+    // for non-graduated tokens jupiter skips mcap field
+    // in the response
     pub mcap: Option<Decimal>,
 }
 

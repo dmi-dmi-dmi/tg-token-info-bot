@@ -94,16 +94,22 @@ async fn message_handler(
             }
         };
 
+        let cap = if data.mcap.is_some() {
+            format!("💵 {}\n", escape(&data.human_readable_mcap()))
+        } else {
+            "".to_owned()
+        };
+
         let message_text = format!(
             "🏷️ *{}* \\- {}\n\
             📜 `{}`\n\
-            💵 {}\n\
+            {}\
             🦎 [GMGN]({})            ☄️ [Meteora pools]({})\n\
             🦝 [Rugcheck]({})        📡 [TrenchRadar]({})",
             escape(&data.symbol),
             escape(&data.name),
             data.id,
-            escape(&data.human_readable_mcap()),
+            cap,
             escape(&data.gmgn_url()),
             escape(&data.meteora_pools()),
             escape(&data.rugcheck_url()),
