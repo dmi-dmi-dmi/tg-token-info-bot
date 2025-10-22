@@ -4,8 +4,8 @@ pub mod token_info;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
-use std::time::Duration;
 
+use chrono::{DateTime, Duration, Utc};
 use flexi_logger::{AdaptiveFormat, Logger};
 use log::{debug, info, warn};
 use teloxide::Bot;
@@ -16,21 +16,28 @@ use teloxide::sugar::request::{RequestLinkPreviewExt, RequestReplyExt};
 use teloxide::types::{Chat, ChatId, Message, ParseMode, ThreadId, Update, User};
 use teloxide::utils::markdown::escape;
 use tokio::sync::RwLock;
-use tokio::time::Instant;
 
 use crate::config::{Config, load_config_or_default};
 use crate::token_info::{TOKEN_REGEX, init_token_regex, retrieve_token_info};
 
 static APP_CONFIG: OnceLock<Config> = OnceLock::new();
 
-const ALLOWED_THROTTLING: Duration = Duration::from_secs(5 * 60);
+const ALLOWED_THROTTLING: Duration = Duration::minutes(5);
 
-type ThrottlingInfo = HashMap<(Cow<'static, str>, ChatId, Option<ThreadId>), Instant>;
+const AGE_THRESHOLD: Duration = Duration::minutes(6);
+
+type ThrottlingInfo = HashMap<(Cow<'static, str>, ChatId, Option<ThreadId>), DateTime<Utc>>;
 
 fn is_whitelisted_chat(chat: &Chat, cfg: &Config) -> bool {
     let ChatId(id) = chat.id;
 
     cfg.whitelisted_chats.contains(&id)
+}
+
+fn is_message_too_old(msg: &Message) -> bool {
+    let diff = Utc::now() - msg.date;
+
+    diff > AGE_THRESHOLD
 }
 
 async fn message_handler(
@@ -40,6 +47,12 @@ async fn message_handler(
     cache: Arc<RwLock<ThrottlingInfo>>,
 ) -> ResponseResult<()> {
     debug!("Got {message:?}");
+
+    if is_message_too_old(&message) {
+        debug!("Message is too old - skipping it");
+
+        return Ok(());
+    }
 
     if !is_whitelisted_chat(&message.chat, APP_CONFIG.get().unwrap()) {
         debug!("Skipping message since it is not coming from whitelisted chat");
@@ -77,8 +90,8 @@ async fn message_handler(
         };
 
         if let Some(latest_mention) = value {
-            let now = Instant::now();
-            if now.duration_since(latest_mention) < ALLOWED_THROTTLING {
+            let now = Utc::now();
+            if (now - latest_mention) < ALLOWED_THROTTLING {
                 info!(
                     "We've sent info on this token {token_ca} not so long time ago so skipping this request for now"
                 );
@@ -132,7 +145,7 @@ async fn message_handler(
                 {
                     let mut cache_guard = cache.write().await;
 
-                    let now = Instant::now();
+                    let now = Utc::now();
                     cache_guard.insert((Cow::Owned(token_ca.to_owned()), message.chat.id, message.thread_id), now);
                     debug!("Inserted info about sent token {token_ca} into throttle data");
                 }
