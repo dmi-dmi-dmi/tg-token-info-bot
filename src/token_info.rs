@@ -1,9 +1,10 @@
 use std::sync::OnceLock;
 
 use anyhow::anyhow;
-use log::warn;
+use log::{debug, warn};
 use regex::{Regex, RegexBuilder};
 use rust_decimal::{Decimal, dec};
+use rust_translate::translate_to_english;
 use serde::Deserialize;
 
 const ONE_THOUSAND: Decimal = Decimal::ONE_THOUSAND;
@@ -26,7 +27,111 @@ fn format_human_readable(num: Decimal, decimal_places: usize) -> String {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct TokenInfo {
+struct ShortEvmTokenInfo {
+    pub address: String,
+    pub name: String,
+    pub symbol: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct EvmTokenInfoSerialized {
+    pub baseToken: ShortEvmTokenInfo,
+    pub quoteToken: ShortEvmTokenInfo,
+    pub marketCap: Decimal,
+}
+
+#[derive(Debug)]
+pub struct EvmTokenInfo {
+    pub id: String,
+    pub name: String,
+    pub symbol: String,
+    pub mcap: Decimal,
+    pub chain: Chain,
+}
+
+impl EvmTokenInfo {
+    pub fn gmgn_url(&self) -> String {
+        let chain = match self.chain {
+            Chain::Bsc => "bsc",
+            Chain::Base => "base",
+        };
+        format!("https://gmgn.ai/{chain}/token/{}", self.id)
+    }
+
+    fn pancake_add_to_pool(&self, second_currency: &str) -> String {
+        let chain = match self.chain {
+            Chain::Bsc => "bsc",
+            Chain::Base => "base",
+        };
+
+        format!(
+            "https://pancakeswap.finance/liquidity/select/{chain}/v3/{}/{second_currency}?chain={chain}",
+            self.id
+        )
+    }
+
+    fn uniswap_add_to_pool(&self, second_currency: &str) -> String {
+        let chain = match self.chain {
+            Chain::Bsc => "bnb",
+            Chain::Base => "base",
+        };
+
+        format!(
+            "https://app.uniswap.org/positions/create?currencyA={second_currency}&currencyB={}&chain={chain}",
+            self.id
+        )
+    }
+
+    pub fn uniswap_add_to_usdt_pool(&self) -> String {
+        let usdt_ca = match self.chain {
+            Chain::Bsc => "0x55d398326f99059ff775485246999027b3197955",
+            Chain::Base => "0xfde4c96c8593536e31f229ea8f37b2ada2699bb2",
+        };
+
+        self.uniswap_add_to_pool(usdt_ca)
+    }
+
+    pub fn uniswap_add_to_usdc_pool(&self) -> String {
+        let usdt_ca = match self.chain {
+            Chain::Bsc => "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
+            Chain::Base => "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        };
+
+        self.uniswap_add_to_pool(usdt_ca)
+    }
+
+    pub fn pancake_add_to_usdt_pool(&self) -> String {
+        let usdt_ca = match self.chain {
+            Chain::Bsc => "0x55d398326f99059ff775485246999027b3197955",
+            Chain::Base => "0xfde4c96c8593536e31f229ea8f37b2ada2699bb2",
+        };
+
+        self.pancake_add_to_pool(usdt_ca)
+    }
+
+    pub fn pancake_add_to_usdc_pool(&self) -> String {
+        let usdt_ca = match self.chain {
+            Chain::Bsc => "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
+            Chain::Base => "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        };
+
+        self.pancake_add_to_pool(usdt_ca)
+    }
+
+    pub fn human_readable_mcap(&self) -> String {
+        format_human_readable(self.mcap, 2)
+    }
+
+    pub fn chain_name(&self) -> &str {
+        match self.chain {
+            Chain::Bsc => "BSC",
+            Chain::Base => "BASE",
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SolanaTokenInfo {
     pub id: String,
     pub name: String,
     pub symbol: String,
@@ -37,7 +142,7 @@ pub struct TokenInfo {
     pub mcap: Option<Decimal>,
 }
 
-impl TokenInfo {
+impl SolanaTokenInfo {
     pub fn trenchradar_url(&self) -> String {
         format!("https://trench.bot/bundles/{}", self.id)
     }
@@ -65,10 +170,10 @@ impl TokenInfo {
     }
 }
 
-pub async fn retrieve_token_info(
+pub async fn retrieve_solana_token_info(
     token_ca: &str,
     client: reqwest::Client,
-) -> anyhow::Result<TokenInfo> {
+) -> anyhow::Result<SolanaTokenInfo> {
     let url = format!("https://lite-api.jup.ag/tokens/v2/search?query={token_ca}");
 
     let mut response = client
@@ -76,15 +181,15 @@ pub async fn retrieve_token_info(
         .send()
         .await?
         .error_for_status()?
-        .json::<Vec<TokenInfo>>()
+        .json::<Vec<SolanaTokenInfo>>()
         .await?;
 
     response.pop().ok_or(anyhow!("Token CA {token_ca} not found on Jupiter"))
 }
 
-pub static TOKEN_REGEX: OnceLock<Regex> = OnceLock::new();
+pub static SOLANA_TOKEN_CA_REGEX: OnceLock<Regex> = OnceLock::new();
 
-pub fn init_token_regex() {
+pub fn init_solana_token_ca_regex() {
     // this is safe as long as the regex itself is valid
     let regex = RegexBuilder::new(
         "(?:https:\\/\\/gmgn\\.ai\\/sol\\/token\\/(?:[a-zA-Z0-9]{4,10}_)?|^|\\s)(?P<token_ca>[1-9A-HJ-NP-Za-km-z]{32,44})",
@@ -93,5 +198,118 @@ pub fn init_token_regex() {
     .build()
     .unwrap();
     // This is safe if init_pool_regex is called just once directly in the main fn
-    TOKEN_REGEX.set(regex).unwrap();
+    SOLANA_TOKEN_CA_REGEX.set(regex).unwrap();
+}
+
+pub static EVM_TOKEN_CA_REGEX: OnceLock<Regex> = OnceLock::new();
+
+pub fn init_evm_token_ca_regex() {
+    // this is safe as long as the regex itself is valid
+    let regex = RegexBuilder::new(
+        "(?:https:\\/\\/gmgn\\.ai\\/(?:bsc|base)\\/token\\/(?:[a-zA-Z0-9]{4,10}_)?|^|\\s)(?P<token_ca>0x[a-fA-F0-9]{40})",
+    )
+    .multi_line(true)
+    .build()
+    .unwrap();
+    // This is safe if init_pool_regex is called just once directly in the main fn
+    EVM_TOKEN_CA_REGEX.set(regex).unwrap();
+}
+
+#[derive(Debug, Copy, Clone, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Chain {
+    Bsc,
+    Base,
+}
+
+pub async fn retrieve_evm_token_info(
+    token_ca: &str,
+    chain: Chain,
+    client: reqwest::Client,
+) -> anyhow::Result<EvmTokenInfo> {
+    let chain_str = match chain {
+        Chain::Bsc => "bsc",
+        Chain::Base => "base",
+    };
+
+    let url = format!("https://api.dexscreener.com/tokens/v1/{chain_str}/{token_ca}");
+    debug!("Going to hit url - {url}");
+
+    let mut response = client
+        .get(url)
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<Vec<EvmTokenInfoSerialized>>()
+        .await?;
+
+    let mut response = response.pop().ok_or(anyhow!("Token CA {token_ca} not found on DEXSCREENER")).and_then(|info| {
+        let token_ca = token_ca.to_uppercase();
+        debug!("{info:?}");
+        let token_info = if info.baseToken.address.to_uppercase() == token_ca {
+            info.baseToken
+        } else if info.quoteToken.address.to_uppercase() == token_ca {
+            info.quoteToken
+        } else {
+            return Err(anyhow!("DEXSCREENER response doesn't contain {token_ca} nor in the base nor quote fields"));
+        };
+
+        Ok(EvmTokenInfo {
+            id: token_info.address,
+            name: token_info.name,
+            symbol: token_info.symbol,
+            mcap: info.marketCap,
+            chain,
+        })
+    });
+
+    if let Ok(info) = response.as_mut()
+        && is_cjk_only(&info.name)
+        && let Ok(translation) = translate_to_english(&info.name).await
+    {
+        let new_name = format!("{} ({})", info.name, translation);
+        info.name = new_name;
+    }
+
+    response
+}
+
+pub async fn translate_token_name() {
+
+}
+
+fn is_cjk_only(s: &str) -> bool {
+    s.chars().all(is_cjk_char)
+}
+
+fn is_cjk_char(c: char) -> bool {
+    c.is_whitespace()
+        || matches!(c as u32,
+            // CJK Unified Ideographs
+            0x4E00..=0x9FFF |
+            // CJK Unified Ideographs Extension A
+            0x3400..=0x4DBF |
+            // CJK Unified Ideographs Extension B-G
+            0x20000..=0x2A6DF |
+            0x2A700..=0x2B73F |
+            0x2B740..=0x2B81F |
+            0x2B820..=0x2CEAF |
+            0x2CEB0..=0x2EBEF |
+            // CJK Compatibility Ideographs
+            0xF900..=0xFAFF |
+            0x2F800..=0x2FA1F |
+            // Hiragana
+            0x3040..=0x309F |
+            // Katakana
+            0x30A0..=0x30FF |
+            // Katakana Phonetic Extensions
+            0x31F0..=0x31FF |
+            // Hangul Syllables
+            0xAC00..=0xD7AF |
+            // Hangul Jamo
+            0x1100..=0x11FF |
+            0x3130..=0x318F |
+            0xA960..=0xA97F |
+            0xD7B0..=0xD7FF
+        )
 }
