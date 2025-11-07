@@ -192,7 +192,7 @@ pub static SOLANA_TOKEN_CA_REGEX: OnceLock<Regex> = OnceLock::new();
 pub fn init_solana_token_ca_regex() {
     // this is safe as long as the regex itself is valid
     let regex = RegexBuilder::new(
-        "(?:https:\\/\\/gmgn\\.ai\\/sol\\/token\\/(?:[a-zA-Z0-9]{4,10}_)?|^|\\s)(?P<token_ca>[1-9A-HJ-NP-Za-km-z]{32,44})",
+        "(?:https:\\/\\/gmgn\\.ai\\/sol\\/token\\/(?:[a-zA-Z0-9]{4,10}_)?|https:\\/\\/jup\\.ag\\/tokens\\/|^|\\s)(?P<token_ca>[1-9A-HJ-NP-Za-km-z]{32,44})",
     )
     .multi_line(true)
     .build()
