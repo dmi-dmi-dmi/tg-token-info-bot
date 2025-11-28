@@ -58,6 +58,24 @@ impl EvmTokenInfo {
         format!("https://gmgn.ai/{chain}/token/{}", self.id)
     }
 
+    pub fn defined_url(&self) -> String {
+        let chain = match self.chain {
+            Chain::Bsc => "bsc",
+            Chain::Base => "base",
+        };
+
+        format!("https://www.defined.fi/{chain}/{}", self.id) 
+    }
+
+    pub fn dextools_url(&self) -> String {
+        let chain = match self.chain {
+            Chain::Bsc => "bnb",
+            Chain::Base => "base",
+        };
+
+        format!("https://www.dextools.io/app/en/{chain}/pair-explorer/{}", self.id)
+    }
+
     pub fn uniswap_add_to_usdt_pool(&self) -> String {
         self.uniswap_add_to_pool(self.get_usdt_ca())
     }
@@ -151,6 +169,10 @@ impl SolanaTokenInfo {
 
     pub fn meteora_pools(&self) -> String {
         format!("https://app.meteora.ag/pools#dlmm?search={}", self.id)
+    }
+
+    pub fn jup_url(&self) -> String {
+        format!("https://jup.ag/tokens/{}", self.id)
     }
 
     pub fn human_readable_mcap(&self) -> String {

@@ -123,7 +123,7 @@ async fn process_evm_cas(
             "🏷️ *{}* \\- {}\n\
             📜 `{}`\n\
             💵 {} \\- {}\n\
-            🦎 [GMGN]({})\n\
+            🦎 [GMGN]({})    🅳 [DF]({})    🔄 [DT]({})\n\
             🥞 [P\\. USDT pools]({})     🥞 [P\\. USDC pools]({})\n\
             🦄 [U\\. USDT pools]({})    🦄 [U\\. USDC pools]({})",
             escape(&token_info.symbol),
@@ -132,9 +132,11 @@ async fn process_evm_cas(
             escape(&token_info.human_readable_mcap()),
             escape(token_info.chain_name()),
             escape(&token_info.gmgn_url()),
+            escape(&token_info.defined_url()),
+            escape(&token_info.dextools_url()),
             escape(&token_info.pancake_add_to_usdt_pool()),
             escape(&token_info.pancake_add_to_usdc_pool()),
-                escape(&token_info.uniswap_add_to_usdt_pool()),
+            escape(&token_info.uniswap_add_to_usdt_pool()),
             escape(&token_info.uniswap_add_to_usdc_pool()),
         );
 
@@ -174,26 +176,22 @@ async fn process_solana_cas(
             }
         };
 
-        let cap = if data.mcap.is_some() {
-            format!("💵 {}\n", escape(&data.human_readable_mcap()))
-        } else {
-            "".to_owned()
-        };
-
         let message_text = format!(
             "🏷️ *{}* \\- {}\n\
             📜 `{}`\n\
-            {}\
+            💵 {} - SOL\n\
             🦎 [GMGN]({})            ☄️ [Meteora pools]({})\n\
-            🦝 [Rugcheck]({})        📡 [TrenchRadar]({})",
+            🦝 [Rugcheck]({})        📡 [TrenchRadar]({})\n\
+            🪐 [JUP]({})",
             escape(&data.symbol),
             escape(&data.name),
             data.id,
-            cap,
+            escape(&data.human_readable_mcap()),
             escape(&data.gmgn_url()),
             escape(&data.meteora_pools()),
             escape(&data.rugcheck_url()),
             escape(&data.trenchradar_url()),
+            escape(&data.jup_url()),
         );
 
         debug!("Prepared message {message_text}");
