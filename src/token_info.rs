@@ -58,64 +58,58 @@ impl EvmTokenInfo {
         format!("https://gmgn.ai/{chain}/token/{}", self.id)
     }
 
-    fn pancake_add_to_pool(&self, second_currency: &str) -> String {
+    pub fn uniswap_add_to_usdt_pool(&self) -> String {
+        self.uniswap_add_to_pool(self.get_usdt_ca())
+    }
+
+    pub fn uniswap_add_to_usdc_pool(&self) -> String {
+        self.uniswap_add_to_pool(self.get_usdc_ca())
+    }
+
+    pub fn pancake_add_to_usdt_pool(&self) -> String {
+        self.pancake_add_to_pool(self.get_usdt_ca())
+    }
+
+    pub fn pancake_add_to_usdc_pool(&self) -> String {
+        self.pancake_add_to_pool(self.get_usdc_ca())
+    }
+
+    fn pancake_add_to_pool(&self, quote: &str) -> String {
         let chain = match self.chain {
             Chain::Bsc => "bsc",
             Chain::Base => "base",
         };
 
+        let base = &self.id;
         format!(
-            "https://pancakeswap.finance/liquidity/select/{chain}/v3/{}/{second_currency}?chain={chain}",
-            self.id
+            "https://pancakeswap.finance/liquidity/select/{chain}/v3/{base}/{quote}?chain={chain}",
         )
     }
 
-    fn uniswap_add_to_pool(&self, second_currency: &str) -> String {
+    fn uniswap_add_to_pool(&self, quote: &str) -> String {
         let chain = match self.chain {
             Chain::Bsc => "bnb",
             Chain::Base => "base",
         };
 
+        let base = &self.id;
         format!(
-            "https://app.uniswap.org/positions/create?currencyA={second_currency}&currencyB={}&chain={chain}",
-            self.id
+            "https://app.uniswap.org/positions/create?currencyA={base}&currencyB={quote}&chain={chain}",
         )
     }
 
-    pub fn uniswap_add_to_usdt_pool(&self) -> String {
-        let usdt_ca = match self.chain {
+    fn get_usdt_ca(&self) -> &'static str {
+        match self.chain {
             Chain::Bsc => "0x55d398326f99059ff775485246999027b3197955",
             Chain::Base => "0xfde4c96c8593536e31f229ea8f37b2ada2699bb2",
-        };
-
-        self.uniswap_add_to_pool(usdt_ca)
+        }
     }
 
-    pub fn uniswap_add_to_usdc_pool(&self) -> String {
-        let usdt_ca = match self.chain {
+    fn get_usdc_ca(&self) -> &'static str {
+        match self.chain {
             Chain::Bsc => "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
             Chain::Base => "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-        };
-
-        self.uniswap_add_to_pool(usdt_ca)
-    }
-
-    pub fn pancake_add_to_usdt_pool(&self) -> String {
-        let usdt_ca = match self.chain {
-            Chain::Bsc => "0x55d398326f99059ff775485246999027b3197955",
-            Chain::Base => "0xfde4c96c8593536e31f229ea8f37b2ada2699bb2",
-        };
-
-        self.pancake_add_to_pool(usdt_ca)
-    }
-
-    pub fn pancake_add_to_usdc_pool(&self) -> String {
-        let usdt_ca = match self.chain {
-            Chain::Bsc => "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
-            Chain::Base => "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-        };
-
-        self.pancake_add_to_pool(usdt_ca)
+        }
     }
 
     pub fn human_readable_mcap(&self) -> String {
@@ -164,7 +158,7 @@ impl SolanaTokenInfo {
             Some(mcap) => format_human_readable(mcap, 2),
             None => {
                 warn!("Token {} has no mcap", self.id);
-                "".to_owned()
+                "??.??K".to_owned()
             },
         }
     }
