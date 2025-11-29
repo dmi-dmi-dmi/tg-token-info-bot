@@ -179,7 +179,7 @@ async fn process_solana_cas(
         let message_text = format!(
             "🏷️ *{}* \\- {}\n\
             📜 `{}`\n\
-            💵 {} - SOL\n\
+            💵 {} \\- SOL\n\
             🦎 [GMGN]({})            ☄️ [Meteora pools]({})\n\
             🦝 [Rugcheck]({})        📡 [TrenchRadar]({})\n\
             🪐 [JUP]({})",
