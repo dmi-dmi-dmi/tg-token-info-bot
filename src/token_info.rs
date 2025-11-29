@@ -7,6 +7,8 @@ use rust_decimal::{Decimal, dec};
 use rust_translate::translate_to_english;
 use serde::Deserialize;
 
+use crate::APP_CONFIG;
+
 const ONE_THOUSAND: Decimal = Decimal::ONE_THOUSAND;
 const ONE_MILLION: Decimal = dec!(1_000_000);
 const ONE_BILLION: Decimal = dec!(1_000_000_000);
@@ -27,17 +29,12 @@ fn format_human_readable(num: Decimal, decimal_places: usize) -> String {
 }
 
 #[derive(Debug, Deserialize)]
-struct ShortEvmTokenInfo {
+struct EvmTokenInfoSerialized {
     pub address: String,
     pub name: String,
     pub symbol: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct EvmTokenInfoSerialized {
-    pub baseToken: ShortEvmTokenInfo,
-    pub quoteToken: ShortEvmTokenInfo,
-    pub marketCap: Decimal,
+    pub market_cap: Decimal,
+    pub created_at: Option<String>,
 }
 
 #[derive(Debug)]
@@ -62,6 +59,8 @@ impl EvmTokenInfo {
         let chain = match self.chain {
             Chain::Bsc => "bsc",
             Chain::Base => "base",
+            // Chain::Arbitrum => "arb",
+            // Chain::Monad => "mon",
         };
 
         format!("https://www.defined.fi/{chain}/{}", self.id) 
@@ -120,6 +119,8 @@ impl EvmTokenInfo {
         match self.chain {
             Chain::Bsc => "0x55d398326f99059ff775485246999027b3197955",
             Chain::Base => "0xfde4c96c8593536e31f229ea8f37b2ada2699bb2",
+            // Chain::Arbitrum => "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+            // Chain::Monad => "0xe7cd86e13AC4309349F30B3435a9d337750fC82D",
         }
     }
 
@@ -127,17 +128,25 @@ impl EvmTokenInfo {
         match self.chain {
             Chain::Bsc => "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
             Chain::Base => "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            // Chain::Arbitrum => "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+            // Chain::Monad => "0x754704bc059f8c67012fed69bc8a327a5aafb603",
         }
     }
 
     pub fn human_readable_mcap(&self) -> String {
-        format_human_readable(self.mcap, 2)
+        if self.mcap > Decimal::ZERO {
+            format_human_readable(self.mcap, 2)
+        } else {
+            "??.??K".to_owned()
+        }
     }
 
     pub fn chain_name(&self) -> &str {
         match self.chain {
             Chain::Bsc => "BSC",
             Chain::Base => "BASE",
+            // Chain::Arbitrum => "ARB",
+            // Chain::Monad => "MON",
         }
     }
 }
@@ -177,11 +186,11 @@ impl SolanaTokenInfo {
 
     pub fn human_readable_mcap(&self) -> String {
         match self.mcap {
-            Some(mcap) => format_human_readable(mcap, 2),
-            None => {
+            Some(mcap) if mcap > Decimal::ZERO => format_human_readable(mcap, 2),
+            _ => {
                 warn!("Token {} has no mcap", self.id);
                 "??.??K".to_owned()
-            },
+            }
         }
     }
 }
@@ -236,6 +245,8 @@ pub fn init_evm_token_ca_regex() {
 pub enum Chain {
     Bsc,
     Base,
+    // Arbitrum,
+    // Monad,
 }
 
 pub async fn retrieve_evm_token_info(
@@ -246,38 +257,41 @@ pub async fn retrieve_evm_token_info(
     let chain_str = match chain {
         Chain::Bsc => "bsc",
         Chain::Base => "base",
+        // Chain::Arbitrum => "arbitrum",
+        // Chain::Monad => "monad",
     };
 
-    let url = format!("https://api.dexscreener.com/tokens/v1/{chain_str}/{token_ca}");
+    let cfg = APP_CONFIG.get().unwrap();
+
+    let url = "https://deep-index.moralis.io/api/v2.2/erc20/metadata";
     debug!("Going to hit url - {url}");
 
     let mut response = client
         .get(url)
+        .query(&[("chain", chain_str), ("addresses[0]", token_ca)])
+        .header("X-API-Key", cfg.moralis_token.clone())
         .send()
         .await?
         .error_for_status()?
         .json::<Vec<EvmTokenInfoSerialized>>()
         .await?;
 
-    let mut response = response.pop().ok_or(anyhow!("Token CA {token_ca} not found on DEXSCREENER")).and_then(|info| {
-        let token_ca = token_ca.to_uppercase();
-        debug!("{info:?}");
-        let token_info = if info.baseToken.address.to_uppercase() == token_ca {
-            info.baseToken
-        } else if info.quoteToken.address.to_uppercase() == token_ca {
-            info.quoteToken
-        } else {
-            return Err(anyhow!("DEXSCREENER response doesn't contain {token_ca} nor in the base nor quote fields"));
-        };
+    let mut response = response
+        .pop()
+        .ok_or(anyhow!("Token CA {token_ca} not found on Moralis at all"))
+        .and_then(|info| {
+            if info.created_at.is_none() {
+                return Err(anyhow!("Token {token_ca} not found on {chain:?}"));
+            }
 
-        Ok(EvmTokenInfo {
-            id: token_info.address,
-            name: token_info.name,
-            symbol: token_info.symbol,
-            mcap: info.marketCap,
-            chain,
-        })
-    });
+            Ok(EvmTokenInfo {
+                id: info.address,
+                name: info.name,
+                symbol: info.symbol,
+                mcap: info.market_cap,
+                chain,
+            })
+        });
 
     if let Ok(info) = response.as_mut()
         && is_cjk_only(&info.name)

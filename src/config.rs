@@ -9,6 +9,12 @@ pub struct Config {
     pub whitelisted_chats: Vec<i64>,
 }
 
+#[derive(Debug)]
+pub struct RuntimeConfig {
+    pub moralis_token: String,
+    pub app_config: Config,
+}
+
 pub fn load_config_or_default<P: AsRef<Path>>(filename: P) -> Config {
     std::fs::read_to_string(filename)
         .inspect_err(|e| {

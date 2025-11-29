@@ -17,10 +17,10 @@ use teloxide::types::{Chat, ChatId, Message, ParseMode, ThreadId, Update, User};
 use teloxide::utils::markdown::escape;
 use tokio::sync::RwLock;
 
-use crate::config::{Config, load_config_or_default};
+use crate::config::{RuntimeConfig, load_config_or_default};
 use crate::token_info::{init_evm_token_ca_regex, init_solana_token_ca_regex, retrieve_evm_token_info, retrieve_solana_token_info, Chain, EVM_TOKEN_CA_REGEX, SOLANA_TOKEN_CA_REGEX};
 
-static APP_CONFIG: OnceLock<Config> = OnceLock::new();
+static APP_CONFIG: OnceLock<RuntimeConfig> = OnceLock::new();
 
 const ALLOWED_THROTTLING: Duration = Duration::minutes(5);
 
@@ -30,10 +30,10 @@ type ThrottlingInfo = HashMap<(Cow<'static, str>, ChatId, Option<ThreadId>), Dat
 
 type Cache = Arc<RwLock<HashMap<(Cow<'static, str>, ChatId, Option<ThreadId>), DateTime<Utc>>>>;
 
-fn is_whitelisted_chat(chat: &Chat, cfg: &Config) -> bool {
+fn is_whitelisted_chat(chat: &Chat, cfg: &RuntimeConfig) -> bool {
     let ChatId(id) = chat.id;
 
-    cfg.whitelisted_chats.contains(&id)
+    cfg.app_config.whitelisted_chats.contains(&id)
 }
 
 fn is_message_too_old(msg: &Message) -> bool {
@@ -124,8 +124,8 @@ async fn process_evm_cas(
             📜 `{}`\n\
             💵 {} \\- {}\n\
             🦎 [GMGN]({})    🅳 [DF]({})    🔄 [DT]({})\n\
-            🥞 [P\\. USDT pools]({})     🥞 [P\\. USDC pools]({})\n\
-            🦄 [U\\. USDT pools]({})    🦄 [U\\. USDC pools]({})",
+            🥞 [P\\. USDT]({})     🥞 [P\\. USDC]({})\n\
+            🦄 [U\\. USDT]({})    🦄 [U\\. USDC]({})",
             escape(&token_info.symbol),
             escape(&token_info.name),
             token_info.id,
@@ -275,7 +275,12 @@ async fn main() {
         panic!("Bot token not found nor in the env variables or in the .env file");
     };
 
-    let config = load_config_or_default("./config.json");
+    let Ok(moralis_token) = std::env::var("MORALIS_TOKEN") else {
+        panic!("Moralis token not found nor in the env variables or in the .env file");
+    };
+
+    let app_config = load_config_or_default("./config.json");
+    let config = RuntimeConfig { moralis_token, app_config };
     APP_CONFIG.set(config).unwrap();
 
     let reqwest_client = reqwest::Client::new();
