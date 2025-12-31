@@ -199,10 +199,12 @@ pub async fn retrieve_solana_token_info(
     token_ca: &str,
     client: reqwest::Client,
 ) -> anyhow::Result<SolanaTokenInfo> {
-    let url = format!("https://lite-api.jup.ag/tokens/v2/search?query={token_ca}");
+    let cfg = APP_CONFIG.get().unwrap();
+    let url = format!("https://api.jup.ag/tokens/v2/search?query={token_ca}");
 
     let mut response = client
         .get(url)
+        .header("x-api-key", cfg.jup_token.as_str())
         .send()
         .await?
         .error_for_status()?
@@ -269,7 +271,7 @@ pub async fn retrieve_evm_token_info(
     let mut response = client
         .get(url)
         .query(&[("chain", chain_str), ("addresses[0]", token_ca)])
-        .header("X-API-Key", cfg.moralis_token.clone())
+        .header("X-API-Key", cfg.moralis_token.as_str())
         .send()
         .await?
         .error_for_status()?

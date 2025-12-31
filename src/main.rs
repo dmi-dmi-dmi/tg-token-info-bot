@@ -287,6 +287,10 @@ async fn main() {
         panic!("Moralis token not found nor in the env variables or in the .env file");
     };
 
+    let Ok(jup_token) = std::env::var("JUP_TOKEN") else {
+        panic!("JUP token not found nor in the env variables or in the .env file");
+    };
+
     let app_config = load_config_or_default("./config.json");
 
     let bot = Bot::new(bot_token);
@@ -300,6 +304,7 @@ async fn main() {
 
     let config = RuntimeConfig {
         moralis_token,
+        jup_token,
         app_config,
         bot_info: bot_ino.user,
     };

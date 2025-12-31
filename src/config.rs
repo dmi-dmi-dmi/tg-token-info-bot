@@ -13,6 +13,7 @@ pub struct Config {
 #[derive(Debug)]
 pub struct RuntimeConfig {
     pub moralis_token: String,
+    pub jup_token: String,
     pub app_config: Config,
     pub bot_info: User,
 }
