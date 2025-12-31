@@ -2,6 +2,7 @@ use std::path::Path;
 
 use log::{debug, warn};
 use serde::Deserialize;
+use teloxide::types::User;
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
@@ -13,6 +14,7 @@ pub struct Config {
 pub struct RuntimeConfig {
     pub moralis_token: String,
     pub app_config: Config,
+    pub bot_info: User,
 }
 
 pub fn load_config_or_default<P: AsRef<Path>>(filename: P) -> Config {

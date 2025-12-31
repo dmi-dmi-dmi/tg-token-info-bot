@@ -56,7 +56,9 @@ async fn message_handler(
         return Ok(());
     }
 
-    if !is_whitelisted_chat(&message.chat, APP_CONFIG.get().unwrap()) {
+    let app_cfg = APP_CONFIG.get().unwrap();
+
+    if !is_whitelisted_chat(&message.chat, app_cfg) {
         debug!("Skipping message since it is not coming from whitelisted chat");
         return Ok(());
     }
@@ -65,6 +67,12 @@ async fn message_handler(
     if let Some(User { is_bot: true, .. }) = message.from {
         debug!("This message is from a bot - ignoring it!");
         return Ok(());
+    }
+
+    let bot_id = &app_cfg.bot_info.id;
+    if let Some(User { id, .. }) = message.forward_from_user() && id == bot_id  {
+        debug!("This is our own message - skipping");
+        return Ok(())
     }
 
     let maybe_text = message.text().or_else(|| message.caption());
@@ -280,14 +288,22 @@ async fn main() {
     };
 
     let app_config = load_config_or_default("./config.json");
-    let config = RuntimeConfig { moralis_token, app_config };
-    APP_CONFIG.set(config).unwrap();
+
+    let bot = Bot::new(bot_token);
+    let Ok(bot_ino) = bot.get_me().await else {
+        panic!("Failed to perform getMe on bot");
+    };
 
     let reqwest_client = reqwest::Client::new();
     init_solana_token_ca_regex();
     init_evm_token_ca_regex();
 
-    let bot = Bot::new(bot_token);
+    let config = RuntimeConfig {
+        moralis_token,
+        app_config,
+        bot_info: bot_ino.user,
+    };
+    APP_CONFIG.set(config).unwrap();
 
     let throttle_info: Arc<RwLock<ThrottlingInfo>> = Arc::new(RwLock::new(HashMap::new()));
 
